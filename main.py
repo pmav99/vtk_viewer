@@ -19,11 +19,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.file_menu = self.menubar.addMenu("&File")
         self.help_menu = self.menubar.addMenu("&Help")
 
-        # create File Menu actions
+        # setup File Menu
         quit_action = self.create_action("&Quit", "Ctrl+Q", "Quit the app", QtCore.QCoreApplication.instance().quit)
         self.add_actions(self.file_menu, quit_action)
 
-        #Create Help Menu's actions.
+        #setup Help Menu
         about_action = self.create_action("&About", QtGui.QKeySequence.HelpContents, "About the demo", self.on_about)
         self.add_actions(self.help_menu, about_action)
 
