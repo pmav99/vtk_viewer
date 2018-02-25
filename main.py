@@ -1,6 +1,7 @@
 import sys
 
 import vtk
+from qtpy import QtGui
 from qtpy import QtCore
 from qtpy import QtWidgets
 
@@ -22,6 +23,10 @@ class MainWindow(QtWidgets.QMainWindow):
         quit_action = self.create_action("&Quit", "Ctrl+Q", "Quit the app", QtCore.QCoreApplication.instance().quit)
         self.add_actions(self.file_menu, quit_action)
 
+        #Create Help Menu's actions.
+        about_action = self.create_action("&About", QtGui.QKeySequence.HelpContents, "About the demo", self.on_about)
+        self.add_actions(self.help_menu, about_action)
+
     def add_actions(self, target, *actions):
         for action in actions:
             if action is None:
@@ -36,6 +41,10 @@ class MainWindow(QtWidgets.QMainWindow):
         action.setStatusTip(tip)
         action.triggered.connect(callback)
         return action
+
+    def on_about(self):
+        msg = """Text appearing in the about dialog of our application."""
+        QtWidgets.QMessageBox.about(self, "About the demo", msg.strip())
 
 
 if __name__=='__main__':
