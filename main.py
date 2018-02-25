@@ -6,6 +6,11 @@ from qtpy import QtCore
 from qtpy import QtWidgets
 
 
+class MyMdiArea(QtWidgets.QMdiArea):
+    def __init__(self, parent):
+        super(MyMdiArea, self).__init__(parent)
+
+
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
@@ -15,6 +20,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setWindowTitle("VTK Viewer")
         self.create_menu()
         self.statusBar()
+        self.mdi = MyMdiArea(self)
+        self.setCentralWidget(self.mdi)
 
     def create_menu(self):
         """ Create the menu bar. """
