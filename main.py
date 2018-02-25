@@ -9,8 +9,12 @@ from qtpy import QtWidgets
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
+        self.setupUI()
+
+    def setupUI(self):
         self.setWindowTitle("VTK Viewer")
         self.create_menu()
+        self.statusBar()
 
     def create_menu(self):
         """ Create the menu bar. """
