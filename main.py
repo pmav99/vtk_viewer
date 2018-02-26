@@ -2,11 +2,29 @@ import abc
 import sys
 import pathlib
 
+from math import pi, sin, cos
+
 import vtk
-from vtk.qt import QVTKRenderWindowInteractor
-from qtpy import QtGui
-from qtpy import QtCore
-from qtpy import QtWidgets
+
+# from vtk.qt import QVTKRenderWindowInteractor
+# from qtpy import QtGui
+# from qtpy import QtCore
+# from qtpy import QtWidgets
+
+from PyQt4 import QtGui
+from PyQt4 import QtGui as QtWidgets
+from PyQt4 import QtCore
+from vtk.qt4 import QVTKRenderWindowInteractor
+
+
+def rad2deg(rad):
+    """Converts radians to degrees."""
+    return rad*180./pi
+
+
+def deg2rad(deg):
+    """Converts degrees to radians."""
+    return deg*pi/180.
 
 
 class VTKViewer(QtWidgets.QFrame):
@@ -32,6 +50,47 @@ class VTKViewer(QtWidgets.QFrame):
     def start(self):
         self.interactor.Initialize()
         self.interactor.Start()
+
+    def view(self, azimuth, elevation):
+        cam = self.renderer.GetActiveCamera()
+
+        phi = deg2rad(azimuth)
+        theta = deg2rad(elevation)
+
+        # We compute the position of the camera on the surface of a sphere
+        # centered at the center of the bounds, with radius chosen from the
+        # bounds.
+        bounds = self.mapper.GetBounds()
+        r = max(bounds[1] - bounds[0],
+                bounds[3] - bounds[2],
+                bounds[5] - bounds[4]) * 2
+        fp = ((bounds[1] + bounds[0]) * 0.5,
+              (bounds[3] + bounds[2]) * 0.5,
+              (bounds[5] + bounds[4]) * 0.5)
+#        r = max(bounds[1::2] - bounds[::2]) * 2
+#        fp = (bounds[1::2] + bounds[::2]) * 0.5
+
+        # Find camera position.
+        x = r*cos(phi)*sin(theta)
+        y = r*sin(phi)*sin(theta)
+        z = r*cos(theta)
+
+        # Now setup the view.
+        cam.SetFocalPoint(fp)
+        cam.SetPosition(fp[0] + x, fp[1] + y, fp[2] + z)
+        cam.ComputeViewPlaneNormal()
+        self.renderer.ResetCameraClippingRange()
+
+        # Reset Roll
+        view_up = [0, 0, 1]
+        if abs(elevation) < 1 or abs(elevation) > 179.:
+            view_up = [sin(phi), cos(phi), 0]
+        cam.SetViewUp(view_up)
+
+        self.renderer.SetActiveCamera(cam)
+        self.interactor.Render()
+
+        return rad2deg(phi), rad2deg(theta), r, fp
 
     def representation_wireframe(self):
         self.actor.GetProperty().SetRepresentationToWireframe()
@@ -224,6 +283,115 @@ class DockModel(MyDock):
             method()
 
 
+class DockCamera(MyDock):
+    def __init__(self, parent):
+        super(DockCamera, self).__init__("Camera", parent)
+
+    def setup_UI(self):
+        # create widgets
+        self.elev_text = QtWidgets.QLineEdit(str(0), self)
+        self.elev_text.setMaximumWidth(60)
+        self.elev_slider = QtWidgets.QSlider(self)
+        self.elev_slider.setRange(-180, 180)
+        self.elev_slider.setValue(0)
+        self.elev_slider.setOrientation(QtCore.Qt.Horizontal)
+        #
+        self.azim_text = QtWidgets.QLineEdit(str(0), self)
+        self.azim_text.setMaximumWidth(60)
+        self.azim_slider = QtWidgets.QSlider(self)
+        self.azim_slider.setRange(0, 180)
+        self.azim_slider.setValue(0)
+        self.azim_slider.setOrientation(QtCore.Qt.Horizontal)
+        #
+        self.Xplus  = QtWidgets.QPushButton("X+", self)
+        self.Xminus = QtWidgets.QPushButton("X-", self)
+        self.Yplus  = QtWidgets.QPushButton("Y+", self)
+        self.Yminus = QtWidgets.QPushButton("Y-", self)
+        self.Zplus  = QtWidgets.QPushButton("Z+", self)
+        self.Zminus = QtWidgets.QPushButton("Z-", self)
+        # place widgets
+        layout = QtWidgets.QFormLayout()
+        layout.addRow("Elevation", self.elev_text)
+        layout.addRow(self.elev_slider)
+        layout.addRow("Azimuth", self.azim_text)
+        layout.addRow(self.azim_slider)
+        layout.addRow(self.Xplus, self.Xminus)
+        layout.addRow(self.Yplus, self.Yminus)
+        layout.addRow(self.Zplus, self.Zminus)
+        self.main_widget.setLayout(layout)
+        # bind events
+        self.azim_slider.valueChanged.connect(self.on_camera_slider)
+        self.elev_slider.valueChanged.connect(self.on_camera_slider)
+        self.Xplus.pressed.connect(self.on_Xplus)
+        self.Xminus.pressed.connect(self.on_Xminus)
+        self.Yplus.pressed.connect(self.on_Yplus)
+        self.Yminus.pressed.connect(self.on_Yminus)
+        self.Zplus.pressed.connect(self.on_Zplus)
+        self.Zminus.pressed.connect(self.on_Zminus)
+
+    def on_camera_slider(self):
+        azimuth = self.azim_slider.value()
+        elevation = self.elev_slider.value()
+        self.azim_text.setText(str(azimuth))
+        self.elev_text.setText(str(elevation))
+        for viewer in self.get_vtk_viewers():
+            viewer.view(elevation, azimuth)
+
+    def on_Xplus(self):
+        """It calls implicitly on_camera_slider method"""
+        self.elev_slider.setValue(180)
+        self.azim_slider.setValue(90)
+        # In case the user has rotated the view with the mouse,
+        # the slider will not have changed. So we explicitly call the view method
+        for viewer in self.get_vtk_viewers():
+            viewer.view(180, 90)
+
+    def on_Xminus(self):
+        """It calls implicitly on_camera_slider method"""
+        self.elev_slider.setValue(0)
+        self.azim_slider.setValue(90)
+        # In case the user has rotated the view with the mouse,
+        # the slider will not have changed. So we explicitly call the view method
+        for viewer in self.get_vtk_viewers():
+            viewer.view(0, 90)
+
+    def on_Yplus(self):
+        """It calls implicitly on_camera_slider method"""
+        self.elev_slider.setValue(-90)
+        self.azim_slider.setValue(90)
+        # In case the user has rotated the view with the mouse,
+        # the slider will not have changed. So we explicitly call the view method
+        for viewer in self.get_vtk_viewers():
+            viewer.view(-90, 90)
+
+    def on_Yminus(self):
+        """It calls implicitly on_camera_slider method"""
+        self.elev_slider.setValue(90)
+        self.azim_slider.setValue(90)
+        # In case the user has rotated the view with the mouse,
+        # the slider will not have changed. So we explicitly call the view method
+        for viewer in self.get_vtk_viewers():
+            viewer.view(90, 90)
+
+    def on_Zplus(self):
+        """It calls implicitly on_camera_slider method"""
+        self.elev_slider.setValue(0)
+        self.azim_slider.setValue(180)
+        # In case the user has rotated the view with the mouse,
+        # the slider will not have changed. So we explicitly call the view method
+        for viewer in self.get_vtk_viewers():
+            viewer.view(0, 180)
+
+    def on_Zminus(self):
+        """It calls implicitly on_camera_slider method"""
+        self.elev_slider.setValue(0)
+        self.azim_slider.setValue(0)
+        # In case the user has rotated the view with the mouse,
+        # the slider will not have changed. So we explicitly call the view method
+        for viewer in self.get_vtk_viewers():
+            viewer.view(0, 0)
+
+
 class MyMdiArea(QtWidgets.QMdiArea):
     def __init__(self, parent):
         super(MyMdiArea, self).__init__(parent)
@@ -274,8 +442,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.mdi = MyMdiArea(self)
         self.setCentralWidget(self.mdi)
 
+        self.dw_camera = DockCamera(self)
         self.dw_representation = DockRepresentation(self)
         self.dw_model = DockModel(self)
+
+        self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.dw_camera)
         self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.dw_representation)
         self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.dw_model)
 
