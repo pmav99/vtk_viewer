@@ -53,6 +53,34 @@ class VTKViewer(QtWidgets.QFrame):
         self.actor.GetProperty().EdgeVisibilityOff()
         self.interactor.update()
 
+    def parallel_projection_on(self):
+        cam = self.renderer.GetActiveCamera()
+        cam.ParallelProjectionOn()
+        self.renderer.SetActiveCamera(cam)
+        self.interactor.Render()
+
+    def parallel_projection_off(self):
+        cam = self.renderer.GetActiveCamera()
+        cam.ParallelProjectionOff()
+        self.renderer.SetActiveCamera(cam)
+        self.interactor.Render()
+
+    def backface_culling_on(self):
+        self.actor.GetProperty().BackfaceCullingOn()
+        self.interactor.Render()
+
+    def backface_culling_off(self):
+        self.actor.GetProperty().BackfaceCullingOff()
+        self.interactor.Render()
+
+    def frontface_culling_on(self):
+        self.actor.GetProperty().FrontfaceCullingOn()
+        self.interactor.Render()
+
+    def frontface_culling_off(self):
+        self.actor.GetProperty().FrontfaceCullingOff()
+        self.interactor.Render()
+
 
 class VTKUnStructuredGridViewer(VTKViewer):
     def __init__(self, parent, filename):
@@ -147,6 +175,53 @@ class DockRepresentation(MyDock):
             viewer.edge_visibility_on()
 
 
+class DockModel(MyDock):
+    def __init__(self, parent):
+        super(DockModel, self).__init__("Model", parent)
+        self.no_culling.toggle()
+
+    # def create_widgets(self):
+    def setup_UI(self):
+        # create widgets
+        self.parallel_projection = QtWidgets.QCheckBox("Parallel Projection", self)
+        self.back_culling = QtWidgets.QRadioButton("Backface Culling", self)
+        self.front_culling = QtWidgets.QRadioButton("Frontface Culling", self)
+        self.no_culling = QtWidgets.QRadioButton("No Culling", self)
+        # place widgets
+        self.layout = QtWidgets.QVBoxLayout()
+        self.layout.addWidget(self.parallel_projection)
+        self.layout.addWidget(self.back_culling)
+        self.layout.addWidget(self.front_culling)
+        self.layout.addWidget(self.no_culling)
+        self.layout.addStretch(1)
+        self.main_widget.setLayout(self.layout)
+        # bind events
+        self.parallel_projection.stateChanged.connect(self.on_parallel_projection)
+        self.back_culling.toggled.connect(self.on_back_culling)
+        self.front_culling.toggled.connect(self.on_front_culling)
+        self.no_culling.toggled.connect(self.on_no_culling)
+
+    def on_back_culling(self):
+        for viewer in self.get_vtk_viewers():
+            viewer.frontface_culling_off()
+            viewer.backface_culling_on()
+
+    def on_front_culling(self):
+        for viewer in self.get_vtk_viewers():
+            viewer.backface_culling_off()
+            viewer.frontface_culling_on()
+            viewer.interactor.Render()
+
+    def on_no_culling(self):
+        for viewer in self.get_vtk_viewers():
+            viewer.backface_culling_off()
+            viewer.frontface_culling_off()
+
+    def on_parallel_projection(self):
+        state = self.parallel_projection.isChecked()
+        for viewer in self.get_vtk_viewers():
+            method = viewer.parallel_projection_on if state else viewer.parallel_projection_off
+            method()
 
 
 class MyMdiArea(QtWidgets.QMdiArea):
@@ -200,7 +275,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setCentralWidget(self.mdi)
 
         self.dw_representation = DockRepresentation(self)
+        self.dw_model = DockModel(self)
         self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.dw_representation)
+        self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.dw_model)
+
     def create_menu(self):
         """ Create the menu bar. """
         # Create the menu Bar.
