@@ -32,6 +32,26 @@ class VTKViewer(QtWidgets.QFrame):
         self.interactor.Initialize()
         self.interactor.Start()
 
+    def representation_wireframe(self):
+        self.actor.GetProperty().SetRepresentationToWireframe()
+        self.interactor.Render()
+
+    def representation_surface(self):
+        self.actor.GetProperty().SetRepresentationToSurface()
+        self.interactor.Render()
+
+    def representation_points(self):
+        self.actor.GetProperty().SetRepresentationToPoints()
+        self.interactor.Render()
+
+    def edge_visibility_on(self):
+        self.actor.GetProperty().EdgeVisibilityOn()
+        self.interactor.Render()
+
+    def edge_visibility_off(self):
+        self.actor.GetProperty().EdgeVisibilityOff()
+        self.interactor.update()
+
 
 class VTKUnStructuredGridViewer(VTKViewer):
     def __init__(self, parent, filename):
@@ -71,6 +91,59 @@ class VTKUnStructuredGridViewer(VTKViewer):
         self.renderer.AddActor(self.actor)
         # self.renderer.AddActor(self.legend)
         # self.renderer.AddActor2D(self.scalar_bar)
+
+
+class DockRepresentation(QtWidgets.QDockWidget):
+    def __init__(self, parent):
+        super(DockRepresentation, self).__init__("Representation", parent)
+
+        # convenient names for the vtk_interactor instances
+        self.parent = parent
+
+        self.main_widget = QtWidgets.QWidget(self)
+
+        self.create_widgets()
+        self.place_widgets()
+        self.bind_events()
+
+        self.setWidget(self.main_widget)
+
+        self.wireframe.toggle()
+
+    def create_widgets(self):
+        self.wireframe = QtWidgets.QRadioButton("Wireframe", self)
+        self.surface= QtWidgets.QRadioButton("Surface", self)
+        self.surface_with_edges = QtWidgets.QRadioButton("Surface with Edges", self)
+
+    def place_widgets(self):
+        self.layout = QtWidgets.QVBoxLayout()
+        self.layout.addWidget(self.surface_with_edges)
+        self.layout.addWidget(self.surface)
+        self.layout.addWidget(self.wireframe)
+        self.layout.addStretch(1)
+        self.main_widget.setLayout(self.layout)
+
+    def bind_events(self):
+        self.wireframe.toggled.connect(self.on_wireframe)
+        self.surface.toggled.connect(self.on_surface)
+        self.surface_with_edges.toggled.connect(self.on_surface_with_edges)
+
+    def get_windows(self):
+        return self.parent.mdi.subWindowList()
+
+    def on_wireframe(self):
+        for window in self.get_windows():
+            window.children()[-1].representation_wireframe()
+
+    def on_surface(self):
+        for window in self.get_windows():
+            window.children()[-1].representation_surface()
+            window.children()[-1].edge_visibility_off()
+
+    def on_surface_with_edges(self):
+        for window in self.get_windows():
+            window.children()[-1].representation_surface()
+            window.children()[-1].edge_visibility_on()
 
 
 class MyMdiArea(QtWidgets.QMdiArea):
@@ -123,6 +196,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.mdi = MyMdiArea(self)
         self.setCentralWidget(self.mdi)
 
+        self.dw_representation = DockRepresentation(self)
+        self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.dw_representation)
     def create_menu(self):
         """ Create the menu bar. """
         # Create the menu Bar.
