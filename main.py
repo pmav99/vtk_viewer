@@ -10,6 +10,34 @@ class MyMdiArea(QtWidgets.QMdiArea):
     def __init__(self, parent):
         super(MyMdiArea, self).__init__(parent)
 
+    def tileHorizontally(self):
+        windows = self.subWindowList()
+        number_of_windows = len(windows)
+        if number_of_windows < 2:
+            self.tileSubWindows()
+        else:
+            window_height = self.height()
+            window_width = self.width() / number_of_windows
+            x = 0
+            for window in windows:
+                window.resize(window_width, window_height)
+                window.move(x, 0)
+                x += window_width
+
+    def tileVertically(self):
+        windows = self.subWindowList()
+        number_of_windows = len(windows)
+        if number_of_windows < 2:
+            self.tileSubWindows()
+        else:
+            window_height = self.height() / number_of_windows
+            window_width = self.width()
+            y = 0
+            for window in windows:
+                window.resize(window_width, window_height)
+                window.move(0, y)
+                y += window_height
+
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
