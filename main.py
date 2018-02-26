@@ -1,3 +1,4 @@
+import abc
 import sys
 import pathlib
 
@@ -93,57 +94,59 @@ class VTKUnStructuredGridViewer(VTKViewer):
         # self.renderer.AddActor2D(self.scalar_bar)
 
 
-class DockRepresentation(QtWidgets.QDockWidget):
+class MyDock(QtWidgets.QDockWidget):
+    def __init__(self, title, parent):
+        super(MyDock, self).__init__(title, parent)
+        self.parent = parent
+        self.main_widget = QtWidgets.QWidget(self)
+        self.setup_UI()
+        self.setWidget(self.main_widget)
+
+    @abc.abstractmethod
+    def setup_UI(self):
+        pass
+
+    def get_vtk_viewers(self):
+        # not the most elegant solution, but it seems to work...
+        return [window.children()[-1] for window in self.parent.mdi.subWindowList()]
+
+
+class DockRepresentation(MyDock):
     def __init__(self, parent):
         super(DockRepresentation, self).__init__("Representation", parent)
 
-        # convenient names for the vtk_interactor instances
-        self.parent = parent
-
-        self.main_widget = QtWidgets.QWidget(self)
-
-        self.create_widgets()
-        self.place_widgets()
-        self.bind_events()
-
-        self.setWidget(self.main_widget)
-
-        self.wireframe.toggle()
-
-    def create_widgets(self):
+    def setup_UI(self):
+        # create widgets
         self.wireframe = QtWidgets.QRadioButton("Wireframe", self)
         self.surface= QtWidgets.QRadioButton("Surface", self)
         self.surface_with_edges = QtWidgets.QRadioButton("Surface with Edges", self)
-
-    def place_widgets(self):
+        # place widgets
         self.layout = QtWidgets.QVBoxLayout()
         self.layout.addWidget(self.surface_with_edges)
         self.layout.addWidget(self.surface)
         self.layout.addWidget(self.wireframe)
         self.layout.addStretch(1)
         self.main_widget.setLayout(self.layout)
-
-    def bind_events(self):
+        # bind events
         self.wireframe.toggled.connect(self.on_wireframe)
         self.surface.toggled.connect(self.on_surface)
         self.surface_with_edges.toggled.connect(self.on_surface_with_edges)
 
-    def get_windows(self):
-        return self.parent.mdi.subWindowList()
-
     def on_wireframe(self):
-        for window in self.get_windows():
-            window.children()[-1].representation_wireframe()
+        for viewer in self.get_vtk_viewers():
+            viewer.representation_wireframe()
 
     def on_surface(self):
-        for window in self.get_windows():
-            window.children()[-1].representation_surface()
-            window.children()[-1].edge_visibility_off()
+        for viewer in self.get_vtk_viewers():
+            viewer.representation_surface()
+            viewer.edge_visibility_off()
 
     def on_surface_with_edges(self):
-        for window in self.get_windows():
-            window.children()[-1].representation_surface()
-            window.children()[-1].edge_visibility_on()
+        for viewer in self.get_vtk_viewers():
+            viewer.representation_surface()
+            viewer.edge_visibility_on()
+
+
 
 
 class MyMdiArea(QtWidgets.QMdiArea):
