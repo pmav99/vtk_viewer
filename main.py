@@ -1,4 +1,5 @@
 import sys
+import pathlib
 
 import vtk
 from vtk.qt import QVTKRenderWindowInteractor
@@ -30,6 +31,46 @@ class VTKViewer(QtWidgets.QFrame):
     def start(self):
         self.interactor.Initialize()
         self.interactor.Start()
+
+
+class VTKUnStructuredGridViewer(VTKViewer):
+    def __init__(self, parent, filename):
+        super(VTKUnStructuredGridViewer, self).__init__(parent)
+
+        self.filename = filename
+
+        # read File
+        self.reader = reader = vtk.vtkUnstructuredGridReader()
+        reader.SetFileName(self.filename.as_posix())
+        reader.Update()
+        self.output = reader.GetOutput()
+        self.scalar_range = self.output.GetScalarRange()
+        scalars_number = reader.GetNumberOfScalarsInFile()
+        self.scalars_names = [reader.GetScalarsNameInFile(i) for i in range(scalars_number)]
+
+        self.current_combo = self.scalars_names[0]
+
+        # Create the custom lut and add it to the mapper
+        self.lut = vtk.vtkLookupTable()
+        self.lut.SetHueRange(0.667, 0) # From Blue to Red
+        self.lut.SetNumberOfTableValues(4)
+        self.lut.Build()          # must be invoked before lut.SetTableValue()
+        self.lut.SetTableValue(0, 0, 1, 0, 1)
+        self.lut.SetTableValue(1, 0, 0, 1, 1)
+        self.lut.SetTableValue(2, 1, 1, 0, 1)
+        self.lut.SetTableValue(3, 1, 0, 0, 1)
+
+        self.mapper = vtk.vtkDataSetMapper()
+        self.mapper.SetInputData(self.output)
+        # self.mapper.SetInputConnection(self.output.GetOutputPort())
+        self.mapper.SetScalarRange(self.scalar_range)
+        self.mapper.SetLookupTable(self.lut)
+
+        self.actor = vtk.vtkActor()
+        self.actor.SetMapper(self.mapper)
+        self.renderer.AddActor(self.actor)
+        # self.renderer.AddActor(self.legend)
+        # self.renderer.AddActor2D(self.scalar_bar)
 
 
 class MyMdiArea(QtWidgets.QMdiArea):
@@ -66,6 +107,11 @@ class MyMdiArea(QtWidgets.QMdiArea):
 
 
 class MainWindow(QtWidgets.QMainWindow):
+    filetype_viewers = {
+        ".vtk": VTKUnStructuredGridViewer,
+    }
+
+
     def __init__(self):
         super().__init__()
         self.setupUI()
@@ -108,7 +154,9 @@ class MainWindow(QtWidgets.QMainWindow):
         return action
 
     def open_file(self, filename):
-        doc = VTKViewer(self.mdi, filename)
+        filepath = pathlib.Path(filename)
+        ViewerClass = self.filetype_viewers[filepath.suffix]
+        doc = ViewerClass(self.mdi, filepath)
         self.mdi.addSubWindow(doc)
         doc.show()
         doc.start()
